@@ -2,7 +2,7 @@
   "name": "d3-context-menu",
   "version": "1.0.1",
   "main": [
-    "js/d3-context-menu.js",
+    "dist/d3-context-menu.js",
     "css/d3-context-menu.css"
   ],
   "ignore": [

@@ -1,7 +1,7 @@
 import * as d3 from 'd3-selection';
 
 const utils = {
-  noop: function() { },
+  noop: function() {},
 
   /**
    * @param {*} value
