@@ -4,37 +4,26 @@ typeof define === 'function' && define.amd ? define(['exports', 'd3-selection'],
 (global = global || self, factory(global.d3 = global.d3 || {}, global.d3));
 }(this, function (exports, d3) { 'use strict';
 
-var utils = {
-  noop: function noop() {},
+function noop() {}
+/**
+ * @param {*} value
+ * @returns {Boolean}
+ */
 
-  /**
-   * @param {*} value
-   * @returns {Boolean}
-   */
-  isFn: function isFn(value) {
-    return typeof value === 'function';
-  },
+function isFn(value) {
+  return typeof value === 'function';
+}
+/**
+ * @param {*} value
+ * @returns {Function}
+ */
 
-  /**
-   * @param {*} value
-   * @returns {Function}
-   */
-  constant: function constant(value) {
-    return function () {
-      return value;
-    };
-  },
-
-  /**
-   * @param {Function|*} value
-   * @param {*} [fallback]
-   * @returns {Function}
-   */
-  toFactory: function toFactory(value, fallback) {
-    value = value === undefined ? fallback : value;
-    return utils.isFn(value) ? value : utils.constant(value);
-  }
-}; // global state for d3-context-menu
+function toFactory(value, fallback) {
+  value = value === undefined ? fallback : value;
+  return isFn(value) ? value : function () {
+    return value;
+  };
+}
 
 var d3ContextMenu = null;
 
@@ -42,7 +31,7 @@ var closeMenu = function closeMenu() {
   // global state is populated if a menu is currently opened
   if (d3ContextMenu) {
     d3.select('.d3-context-menu').remove();
-    d3.select('body').on('mousedown.d3-context-menu', null);
+    d3.select('body').on('mousedown.d3-context-menu', null, true);
     d3ContextMenu.boundCloseCallback();
     d3ContextMenu = null;
   }
@@ -65,9 +54,9 @@ var d3ContextMenu$1 = (function (menuItems, config) {
   // and `config` an object
 
 
-  menuItems = utils.toFactory(menuItems);
+  menuItems = toFactory(menuItems);
 
-  if (utils.isFn(config)) {
+  if (isFn(config)) {
     config = {
       onOpen: config
     };
@@ -76,10 +65,10 @@ var d3ContextMenu$1 = (function (menuItems, config) {
   } // resolve config
 
 
-  var openCallback = config.onOpen || utils.noop;
-  var closeCallback = config.onClose || utils.noop;
-  var positionFactory = utils.toFactory(config.position);
-  var themeFactory = utils.toFactory(config.theme, 'd3-context-menu-theme');
+  var openCallback = config.onOpen || noop;
+  var closeCallback = config.onClose || noop;
+  var positionFactory = toFactory(config.position);
+  var themeFactory = toFactory(config.theme, 'd3-context-menu-theme');
   /**
    * Context menu event handler
    * @param {*} data
@@ -98,45 +87,11 @@ var d3ContextMenu$1 = (function (menuItems, config) {
     d3.selectAll('.d3-context-menu').data([1]).enter().append('div').attr('class', 'd3-context-menu ' + themeFactory.bind(element)(data, index)); // close menu on mousedown outside
 
     d3.select('body').on('mousedown.d3-context-menu', closeMenu, true);
-    var list = d3.selectAll('.d3-context-menu').on('contextmenu', function () {
+    d3.selectAll('.d3-context-menu').on('contextmenu', function () {
       closeMenu();
       d3.event.preventDefault();
       d3.event.stopPropagation();
-    }).append('ul');
-    list.selectAll('li').data(menuItems.bind(element)(data, index)).enter().append('li').attr('class', function (d) {
-      var ret = '';
-
-      if (utils.toFactory(d.divider).bind(element)(data, index)) {
-        ret += ' is-divider';
-      }
-
-      if (utils.toFactory(d.disabled).bind(element)(data, index)) {
-        ret += ' is-disabled';
-      }
-
-      if (!d.action) {
-        ret += ' is-header';
-      }
-
-      return ret;
-    }).html(function (d) {
-      if (utils.toFactory(d.divider).bind(element)(data, index)) {
-        return '<hr>';
-      }
-
-      if (!d.title) {
-        console.error('No title attribute set. Check the spelling of your options.');
-      }
-
-      return utils.toFactory(d.title).bind(element)(data, index);
-    }).on('click', function (d, i) {
-      if (utils.toFactory(d.disabled).bind(element)(data, index)) return; // do nothing if disabled
-
-      if (!d.action) return; // headers have no "action"
-
-      d.action.bind(element)(data, index);
-      closeMenu();
-    }); // the openCallback allows an action to fire before the menu is displayed
+    }).append('ul').call(createNestedMenu, element); // the openCallback allows an action to fire before the menu is displayed
     // an example usage would be closing a tooltip
 
     if (openCallback.bind(element)(data, index) === false) {
@@ -149,6 +104,38 @@ var d3ContextMenu$1 = (function (menuItems, config) {
     d3.select('.d3-context-menu').style('left', (position ? position.left : d3.event.pageX - 2) + 'px').style('top', (position ? position.top : d3.event.pageY - 2) + 'px').style('display', 'block');
     d3.event.preventDefault();
     d3.event.stopPropagation();
+
+    function createNestedMenu(parent, root) {
+      var depth = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 0;
+
+      var resolve = function resolve(value) {
+        return toFactory(value).call(root, data, index);
+      };
+
+      var listItems = parent.selectAll('li').data(function (d) {
+        var baseData = depth === 0 ? menuItems : d.children;
+        return resolve(baseData);
+      }).enter().append('li').each(function (d) {
+        // get value of each data
+        var isDivider = !!resolve(d.divider);
+        var disabled = !!resolve(d.disabled);
+        var hasChildren = !!resolve(d.children);
+        var hasAction = !!d.action;
+        var title = resolve(d.title);
+        var listItem = d3.select(this).classed('is-divider', isDivider).classed('is-disabled', disabled).classed('is-header', !hasChildren && !hasAction).classed('is-parent', hasChildren).html(isDivider ? '<hr>' : title).on('click', function () {
+          // do nothing if disabled or no action
+          if (disabled || !hasAction) return;
+          d.action.call(root, data, index);
+          closeMenu();
+        });
+
+        if (hasChildren) {
+          // create children(`next parent`) and call recursive
+          var children = listItem.append('ul').classed('is-children', true);
+          createNestedMenu(children, root, ++depth);
+        }
+      });
+    }
   };
 });
 
