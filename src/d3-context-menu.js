@@ -4,6 +4,9 @@ import {noop, isFn, toFactory} from './utils'
 // global state for d3-context-menu
 let d3ContextMenu = null;
 
+// event cache for d3-context-menu
+let eventCache = null;
+
 const closeMenu = () => {
   // global state is populated if a menu is currently opened
   if (d3ContextMenu) {
@@ -60,6 +63,9 @@ export default (menuItems, config) => {
       boundCloseCallback: closeCallback.bind(element, data, index)
     };
 
+    // store contextmenu event;
+    eventCache = d3.event;
+
     // create the div element that will hold the context menu
     d3.selectAll('.d3-context-menu').data([1])
       .enter()
@@ -98,7 +104,7 @@ export default (menuItems, config) => {
 
 
     function createNestedMenu(parent, root, depth = 0) {
-      const resolve = value => toFactory(value).call(root, data, index);
+      const resolve = value => toFactory(value).call(root, data, index, eventCache);
       const listItems = parent.selectAll('li')
         .data(d => {
           const baseData = depth === 0 ? menuItems : d.children;
@@ -124,7 +130,7 @@ export default (menuItems, config) => {
               // do nothing if disabled or no action
               if (disabled || !hasAction) return;
 
-              d.action.call(root, data, index);
+              d.action.call(root, data, index, eventCache);
               closeMenu();
             });
 

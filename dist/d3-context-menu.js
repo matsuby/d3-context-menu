@@ -25,7 +25,9 @@ function toFactory(value, fallback) {
   };
 }
 
-var d3ContextMenu = null;
+var d3ContextMenu = null; // event cache for d3-context-menu
+
+var eventCache = null;
 
 var closeMenu = function closeMenu() {
   // global state is populated if a menu is currently opened
@@ -82,7 +84,9 @@ var d3ContextMenu$1 = (function (menuItems, config) {
 
     d3ContextMenu = {
       boundCloseCallback: closeCallback.bind(element, data, index)
-    }; // create the div element that will hold the context menu
+    }; // store contextmenu event;
+
+    eventCache = d3.event; // create the div element that will hold the context menu
 
     d3.selectAll('.d3-context-menu').data([1]).enter().append('div').attr('class', 'd3-context-menu ' + themeFactory.bind(element)(data, index)); // close menu on mousedown outside
 
@@ -109,7 +113,7 @@ var d3ContextMenu$1 = (function (menuItems, config) {
       var depth = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 0;
 
       var resolve = function resolve(value) {
-        return toFactory(value).call(root, data, index);
+        return toFactory(value).call(root, data, index, eventCache);
       };
 
       var listItems = parent.selectAll('li').data(function (d) {
@@ -125,7 +129,7 @@ var d3ContextMenu$1 = (function (menuItems, config) {
         var listItem = d3.select(this).classed('is-divider', isDivider).classed('is-disabled', disabled).classed('is-header', !hasChildren && !hasAction).classed('is-parent', hasChildren).html(isDivider ? '<hr>' : title).on('click', function () {
           // do nothing if disabled or no action
           if (disabled || !hasAction) return;
-          d.action.call(root, data, index);
+          d.action.call(root, data, index, eventCache);
           closeMenu();
         });
 
